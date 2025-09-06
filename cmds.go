@@ -4,14 +4,16 @@ import (
 	"errors"
 
 	"github.com/sjadczak/gator/internal/config"
+	"github.com/sjadczak/gator/internal/database"
 )
 
 var (
-	ErrUnknownCmd  = errors.New("unrecognized command")
-	ErrInvalidArgs = errors.New("invalid command arguments")
+	ErrUnknownCmd  = errors.New(" gator> unrecognized command")
+	ErrInvalidArgs = errors.New(" gator> invalid command arguments")
 )
 
 type state struct {
+	db  *database.Queries
 	cfg *config.Config
 }
 

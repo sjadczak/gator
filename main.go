@@ -1,11 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 
+	_ "github.com/lib/pq"
 	"github.com/sjadczak/gator/internal/config"
+	"github.com/sjadczak/gator/internal/database"
 )
 
 func main() {
@@ -14,18 +17,27 @@ func main() {
 		fmt.Printf("could not read config: %v", err)
 		os.Exit(1)
 	}
+	db, err := sql.Open("postgres", cfg.DbUrl)
+	if err != nil {
+		fmt.Printf("could not connect to db: %v", err)
+		os.Exit(1)
+	}
+	dbQueries := database.New(db)
 
-	s := &state{cfg}
+	s := &state{dbQueries, cfg}
 	cmdMap := make(map[string]func(*state, command) error)
 	cmds := &commands{
 		cmdMap,
 	}
 	cmds.register("login", handleLogin)
+	cmds.register("register", handleRegister)
+	cmds.register("reset", handleReset)
+	cmds.register("users", handleUsers)
 
 	if len(os.Args) < 2 {
-		msg := "missing command\n" +
-			"Usage:\n" +
-			"gator <command> [args...]"
+		msg := " gator> missing command\n\n" +
+			" Usage:\n" +
+			" gator <command> [args...]"
 
 		fmt.Println(msg)
 		os.Exit(1)
@@ -41,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 	if err != nil {
-		fmt.Printf("failed to run command: %v", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
