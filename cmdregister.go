@@ -16,6 +16,7 @@ func handleRegister(s *state, cmd command) error {
 			" gator register <username>\n" +
 			" examples: gator register boots\n"
 		fmt.Println(msg)
+		return ErrInvalidArgs
 	}
 
 	username := cmd.args[0]
