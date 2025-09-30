@@ -22,8 +22,10 @@ type command struct {
 	args []string
 }
 
+type handlerFunc func(*state, command) error
+
 type commands struct {
-	cmds map[string]func(*state, command) error
+	cmds map[string]handlerFunc
 }
 
 func (c *commands) run(s *state, cmd command) error {
@@ -33,7 +35,7 @@ func (c *commands) run(s *state, cmd command) error {
 	return ErrUnknownCmd
 }
 
-func (c *commands) register(name string, fn func(*state, command) error) error {
+func (c *commands) register(name string, fn handlerFunc) error {
 	c.cmds[name] = fn
 	return nil
 }

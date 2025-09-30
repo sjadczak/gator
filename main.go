@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -25,7 +26,7 @@ func main() {
 	dbQueries := database.New(db)
 
 	s := &state{dbQueries, cfg}
-	cmdMap := make(map[string]func(*state, command) error)
+	cmdMap := make(map[string]handlerFunc)
 	cmds := &commands{
 		cmdMap,
 	}
@@ -34,10 +35,11 @@ func main() {
 	cmds.register("reset", handleReset)
 	cmds.register("users", handleUsers)
 	cmds.register("agg", handleAgg)
-	cmds.register("addfeed", handleAddFeed)
+	cmds.register("addfeed", middlewareLoggedIn(handleAddFeed))
 	cmds.register("feeds", handleFeeds)
-	cmds.register("follow", handleFollow)
-	cmds.register("following", handleFollowing)
+	cmds.register("follow", middlewareLoggedIn(handleFollow))
+	cmds.register("following", middlewareLoggedIn(handleFollowing))
+	cmds.register("unfollow", middlewareLoggedIn(handleUnfollow))
 
 	if len(os.Args) < 2 {
 		msg := " gator> missing command\n\n" +
@@ -60,5 +62,16 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+}
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(s *state, cmd command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.Username)
+		if err != nil {
+			return errors.New(" gator> no user logged in")
+		}
+
+		return handler(s, cmd, user)
 	}
 }

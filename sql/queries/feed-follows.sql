@@ -43,3 +43,14 @@ WHERE
         FROM users
         WHERE users.name = $1
     );
+
+-- name: UnfollowFeed :exec
+DELETE FROM feed_follows ff
+WHERE
+    ff.user_id = $1
+    AND ff.feed_id = (
+        SELECT f.id
+        FROM feeds f
+        WHERE
+            f.url = $2
+    );

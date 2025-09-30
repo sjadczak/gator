@@ -11,7 +11,7 @@ import (
 )
 
 // TODO: refactor to include feed follow on add new feed
-func handleAddFeed(s *state, cmd command) error {
+func handleAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		msg := " gator> Usage:\n" +
 			" gator addfeed <name> <url>\n" +
@@ -24,11 +24,6 @@ func handleAddFeed(s *state, cmd command) error {
 	url := cmd.args[1]
 
 	ctx := context.Background()
-	user, err := s.db.GetUser(ctx, s.cfg.Username)
-	if err != nil {
-		msg := fmt.Sprintf(" gator> user `%s` not found\n", s.cfg.Username)
-		return errors.New(msg)
-	}
 	feed, err := s.db.CreateFeed(
 		ctx,
 		database.CreateFeedParams{
@@ -43,6 +38,19 @@ func handleAddFeed(s *state, cmd command) error {
 	if err != nil {
 		msg := fmt.Sprintf(" gator> failed to create feed `%s`", name)
 		return errors.New(msg)
+	}
+	_, err = s.db.CreateFeedFollow(
+		ctx,
+		database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			UserID:    user.ID,
+			FeedID:    feed.ID,
+		},
+	)
+	if err != nil {
+		return errors.New(" gator> failed to create feed follow")
 	}
 
 	fmt.Printf("%v\n", feed)

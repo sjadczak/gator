@@ -10,11 +10,11 @@ import (
 	"github.com/sjadczak/gator/internal/database"
 )
 
-func handleFollow(s *state, cmd command) error {
+func handleFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 1 {
 		msg := " gator> Usage:\n" +
 			" gator follow <url>\n" +
-			" example: gator follow https://hnrss.org/newest"
+			" example: gator follow https://hnrss.org/newkest"
 		fmt.Println(msg)
 		return ErrInvalidArgs
 	}
@@ -22,11 +22,6 @@ func handleFollow(s *state, cmd command) error {
 	feedUrl := cmd.args[0]
 
 	ctx := context.Background()
-	user, err := s.db.GetUser(ctx, s.cfg.Username)
-	if err != nil {
-		msg := fmt.Sprintf(" gator> user `%s` not found\n", s.cfg.Username)
-		return errors.New(msg)
-	}
 	feed, err := s.db.GetFeed(ctx, feedUrl)
 	if err != nil {
 		msg := fmt.Sprintf(" gator> no feed found for `%s`", feedUrl)
@@ -48,7 +43,7 @@ func handleFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handleFollowing(s *state, cmd command) error {
+func handleFollowing(s *state, cmd command, user database.User) error {
 	ctx := context.Background()
 	fmt.Printf(" gator> finding %s's feed follows...\n", s.cfg.Username)
 	follows, err := s.db.GetUserFeedFollows(ctx, s.cfg.Username)
@@ -64,5 +59,28 @@ func handleFollowing(s *state, cmd command) error {
 			fmt.Printf(" - %s: %s\n", f.Username, f.Feedname)
 		}
 	}
+	return nil
+}
+
+func handleUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 1 {
+		msg := " gator> Usage:\n" +
+			" gator unfollow <url>\n" +
+			" example: gator unfollow https://hnrss.org/newkest"
+		fmt.Println(msg)
+		return ErrInvalidArgs
+	}
+
+	feedUrl := cmd.args[0]
+	err := s.db.UnfollowFeed(context.Background(), database.UnfollowFeedParams{
+		UserID: user.ID,
+		Url:    feedUrl,
+	})
+	if err != nil {
+		msg := fmt.Sprintf(" gator> failed to unfollow `%s` for %s", feedUrl, user.Name)
+		return errors.New(msg)
+	}
+
+	fmt.Printf(" gator> unfollowed '%s' for %s", feedUrl, user.Name)
 	return nil
 }
