@@ -11,6 +11,7 @@ import (
 	"github.com/sjadczak/gator/internal/database"
 )
 
+// main function runs the CLI
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
