@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -9,8 +10,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/sjadczak/gator/internal/database"
 	"github.com/sjadczak/gator/internal/rss"
 )
 
@@ -79,9 +83,17 @@ func scrapeFeeds(s *state) {
 
 	fmt.Printf(" > gator: Fetching posts from %s\n", toFetch.Name)
 	for _, p := range feed.Channel.Item {
-		fmt.Printf("    - Post: %s\n", p.Title)
+		s.db.CreatePost(ctx, database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			Title:       p.Title,
+			Url:         p.Link,
+			Description: sql.NullString{String: p.Description, Valid: true},
+			PublishedAt: sql.NullString{String: p.PubDate, Valid: true},
+			FeedID:      toFetch.ID,
+		})
 	}
-	fmt.Printf("    Found %d posts\n", len(feed.Channel.Item))
+	fmt.Printf("    - Found %d posts\n", len(feed.Channel.Item))
 }
 
 // func printItem(i rss.RSSItem, l int) {
@@ -148,4 +160,35 @@ func handleAgg(s *state, cmd command) error {
 	for ; ; <-ticker.C {
 		scrapeFeeds(s)
 	}
+}
+
+func handleBrowse(s *state, cmd command) error {
+	limit := 2
+	if len(cmd.args) == 1 {
+		l, err := strconv.Atoi(cmd.args[0])
+		if err != nil {
+			fmt.Printf("limit couldn't be parsed as integer: %v\n", err)
+		}
+		limit = l
+	}
+
+	posts, err := s.db.GetPostsByUser(context.Background(), database.GetPostsByUserParams{
+		Name:  s.cfg.Username,
+		Limit: int32(limit),
+	})
+	if err != nil {
+		msg := fmt.Sprintf("handleBrowse: %v", err)
+		return errors.New(msg)
+	}
+
+	if len(posts) > 0 {
+		fmt.Printf(" > gator: Showing %d posts for %s...\n", limit, s.cfg.Username)
+		for _, p := range posts {
+			fmt.Printf("    - %s\n", p.Title)
+		}
+	} else {
+		fmt.Println(" > gator: no posts found.")
+	}
+
+	return nil
 }
