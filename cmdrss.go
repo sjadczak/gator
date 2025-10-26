@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/sjadczak/gator/internal/rss"
 )
@@ -56,6 +57,33 @@ func fetchFeed(ctx context.Context, feedUrl string) (*rss.RSSFeed, error) {
 	return feed, nil
 }
 
+func scrapeFeeds(s *state) {
+	ctx := context.Background()
+	toFetch, err := s.db.GetNextFeedToFetch(ctx)
+	if err != nil {
+		fmt.Printf("GetNextFeedToFetch error: %v\n", err)
+		os.Exit(1)
+	}
+
+	toFetch, err = s.db.MarkFeedFetched(ctx, toFetch.ID)
+	if err != nil {
+		fmt.Printf("MarkFeedFetched error: %v\n", err)
+		os.Exit(1)
+	}
+
+	feed, err := fetchFeed(ctx, toFetch.Url)
+	if err != nil {
+		fmt.Printf("fetchFeed error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf(" > gator: Fetching posts from %s\n", toFetch.Name)
+	for _, p := range feed.Channel.Item {
+		fmt.Printf("    - Post: %s\n", p.Title)
+	}
+	fmt.Printf("    Found %d posts\n", len(feed.Channel.Item))
+}
+
 // func printItem(i rss.RSSItem, l int) {
 // 	props := []string{
 // 		i.Title,
@@ -101,16 +129,23 @@ func fetchFeed(ctx context.Context, feedUrl string) (*rss.RSSFeed, error) {
 // }
 
 func handleAgg(s *state, cmd command) error {
-	fmt.Println(" gator> fetching rss feed...")
-	url := "https://www.wagslane.dev/index.xml"
-	ctx := context.Background()
-	feed, err := fetchFeed(ctx, url)
-	if err != nil {
-		fmt.Printf("handleAgg err: %v", err)
-		os.Exit(1)
+	if len(cmd.args) < 1 {
+		msg := " gator> Usage:\n" +
+			" gator agg <time_between_requests>\n" +
+			" example: gator agg 15m"
+		fmt.Println(msg)
+		return ErrInvalidArgs
 	}
 
-	// printFeed(feed, 80)
-	fmt.Printf("%v\n", feed)
-	return nil
+	step, err := time.ParseDuration(cmd.args[0])
+	if err != nil {
+		fmt.Printf(" gator> failed to parse `%s` as time.Duration.", cmd.args[0])
+		return ErrInvalidArgs
+	}
+
+	fmt.Printf(" > gator: collecting feeds every %s...\n", step)
+	ticker := time.NewTicker(step)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 }
